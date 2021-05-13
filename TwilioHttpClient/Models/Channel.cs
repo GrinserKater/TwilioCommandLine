@@ -13,6 +13,14 @@ namespace TwilioHttpClient.Models
         public DateTime? DateUpdated { get; set; }
 
         public ChannelAttributes Attributes { get; set; }
+        public string AttributesRaw { get; }
+
+        public Channel(){}
+
+        public Channel(string attributesRawValue)
+        {
+            AttributesRaw = attributesRawValue;
+        }
 
         public override string ToString()
         {

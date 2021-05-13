@@ -1,9 +1,9 @@
 ﻿using System.Collections.Generic;
-using TheGrandMigrator.Abstractions;
+using TheGrandExecutor.Abstractions;
 
-namespace TheGrandMigrator.Models
+namespace TheGrandExecutor.Models
 {
-	public class MigrationResult<T> : IMigrationResult<T>
+	public class ExecutionResult<T> : IExecutionResult<T>
 	{
 		public bool IsFailure => ErrorMessages.Count > 0;
 		public int FetchedCount => EntitiesFetched.Count; 
@@ -19,7 +19,7 @@ namespace TheGrandMigrator.Models
 
 		public string Message { get; set; }
 
-		public MigrationResult()
+		public ExecutionResult()
 		{
 			EntitiesFetched   = new List<T>();
 			EntitiesSucceeded = new List<T>();

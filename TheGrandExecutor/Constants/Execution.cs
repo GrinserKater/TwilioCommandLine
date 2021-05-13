@@ -1,6 +1,6 @@
-﻿namespace TheGrandMigrator.Constants
+﻿namespace TheGrandExecutor.Constants
 {
-	public static class Migration
+	public static class Execution
 	{
 		public const int DefaultLimitValues = 100;
 		public const int DefaultPageSize    = 20;

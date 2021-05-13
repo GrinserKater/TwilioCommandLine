@@ -4,15 +4,12 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Common.Results;
-using SendbirdHttpClient.Abstractions;
-using SendbirdHttpClient.Models.Channel;
-using SendbirdHttpClient.Models.Common;
-using TheGrandMigrator.Enums;
-using TheGrandMigrator.Models;
+using TheGrandExecutor.Enums;
+using TheGrandExecutor.Models;
 using TwilioHttpClient.Abstractions;
 using TwilioHttpClient.Models;
 
-namespace TheGrandMigrator.Utilities
+namespace TheGrandExecutor.Utilities
 {
 	public static class MigrationUtilities
 	{

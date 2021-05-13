@@ -13,7 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CommandManager\CommandManager.csproj" />
-    <ProjectReference Include="..\TheGrandMigrator\TheGrandExecutor.csproj" />
+    <ProjectReference Include="..\TheGrandExecutor\TheGrandExecutor.csproj" />
     <ProjectReference Include="..\TwilioHttpClient\TwilioHttpClient.csproj" />
   </ItemGroup>
 

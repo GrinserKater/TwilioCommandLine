@@ -1,4 +1,4 @@
-﻿namespace TheGrandMigrator.Enums
+﻿namespace TheGrandExecutor.Enums
 {
 	public enum OperationResult : byte
 	{

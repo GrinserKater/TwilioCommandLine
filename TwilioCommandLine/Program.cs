@@ -2,14 +2,14 @@
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using TheGrandMigrator.Abstractions;
 using CommandManager;
 using CommandManager.Enums;
-using SandBirdMigrationAttributes.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using TheGrandExecutor.Abstractions;
+using TwilioCommandLine.Logging;
 using TwilioHttpClient.Abstractions;
 
-namespace SandBirdMigrationAttributes
+namespace TwilioCommandLine
 {
     class Program
     {
@@ -25,7 +25,7 @@ namespace SandBirdMigrationAttributes
 			if (options.LogToFile)
 			{
 				Directory.CreateDirectory(LoggingUtilities.LogFolder);
-				_logFileName = String.Format(_logFileName, options.MigrationSubject.ToString("G"));
+				_logFileName = String.Format(_logFileName, options.ExecutionAction.ToString("G"));
 				Trace.Listeners.Add(new TextWriterTraceListener(File.CreateText(_logFileName)));
 			}
 
@@ -33,28 +33,25 @@ namespace SandBirdMigrationAttributes
 			{
 				ServiceProvider serviceProvider = InversionOfControl.Setup();
 
-				IMigrator grandMigrator = serviceProvider.GetRequiredService<IMigrator>();
+				IExecutor grandExecutor = serviceProvider.GetRequiredService<IExecutor>();
 
-				Trace.WriteLine($"Starting migrations of {options.MigrationSubject:G} - {DateTime.Now.ToShortDateString()}.");
+				Trace.WriteLine($"Starting {options.ExecutionAction:G} of {(options.UserId != 0 ? $"user with ID {options.UserId}" : $"channel with unique name {options.ChannelUniqueIdentifier}")} - {DateTime.Now.ToShortDateString()}.");
 
 				var sw = new Stopwatch();
 				sw.Start();
-                IMigrationResult<IResource> migrationResult;
-				switch (options.MigrationSubject)
+                IExecutionResult<IResource> migrationResult;
+				switch (options.ExecutionAction)
 				{
-					case MigrationSubject.User:
-						migrationResult = await grandMigrator.MigrateUsersAttributesAsync(options.DateBefore, options.DateAfter, options.ResourceLimit, options.PageSize);
+					case ExecutionAction.Unblock:
+						migrationResult = await grandExecutor.MigrateUsersAttributesAsync(options.DateBefore, options.DateAfter, options.ResourceLimit, options.PageSize);
 						break;
-					case MigrationSubject.Channel:
+					case ExecutionAction.Block:
 						migrationResult = String.IsNullOrWhiteSpace(options.ChannelUniqueIdentifier) ?
-							await grandMigrator.MigrateChannelsAttributesAsync(options.DateBefore, options.DateAfter, options.ResourceLimit, options.PageSize) :
-							await grandMigrator.MigrateSingleChannelAttributesAsync(options.DateBefore, options.DateAfter, options.ChannelUniqueIdentifier);
+							await grandExecutor.MigrateChannelsAttributesAsync(options.DateBefore, options.DateAfter, options.ResourceLimit, options.PageSize) :
+							await grandExecutor.MigrateSingleChannelAttributesAsync(options.DateBefore, options.DateAfter, options.ChannelUniqueIdentifier);
                         break;
-					case MigrationSubject.Account:
-						migrationResult = await grandMigrator.MigrateSingleAccountAttributesAsync(options.DateBefore, options.DateAfter, options.AccoutId, options.ResourceLimit, options.PageSize);
-						break;
-					default:
-						Trace.WriteLine($"Unsupported migration entity {options.MigrationSubject:G}.");
+                    default:
+						Trace.WriteLine($"Unsupported migration entity {options.ExecutionAction:G}.");
 						return;
 				}
 				sw.Stop();

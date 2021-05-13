@@ -1,10 +1,10 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
-using TheGrandMigrator.Abstractions;
+using TheGrandExecutor.Abstractions;
 using TwilioHttpClient.Abstractions;
 
-namespace SandBirdMigrationAttributes.Logging
+namespace TwilioCommandLine.Logging
 {
     public static class LoggingUtilities
     {
@@ -19,7 +19,7 @@ namespace SandBirdMigrationAttributes.Logging
             Directory.CreateDirectory(LogFolder);
         }
 
-        public static void WriteMigrationResultLogFiles(IMigrationResult<IResource> result)
+        public static void WriteMigrationResultLogFiles(IExecutionResult<IResource> result)
         {
             if (result.SuccessCount > 0) File.AppendAllLines(SuccessLogFileName, result.EntitiesSucceeded.Select(e => e.ToString()).ToArray());
 

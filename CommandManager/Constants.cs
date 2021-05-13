@@ -18,6 +18,9 @@
             public const string LogToFileArgument = "logtofile";
             public const string AfterArgument = "after";
             public const string BeforeArgument = "before";
+            public const string UserIdArgument = "userid";
+            public const string UniqueNameArgument = "uniquename";
+            public const string BlockedListingsArgument = "blockedlistings";
         }
     }
 }

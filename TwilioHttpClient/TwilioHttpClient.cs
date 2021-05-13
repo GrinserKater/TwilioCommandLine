@@ -148,7 +148,7 @@ namespace TwilioHttpClient
 			{
 				ChannelResource fetchResult = await ChannelResource.FetchAsync(_chatServiceId, channelUniqueIdentifier, _twilioRestClient).ConfigureAwait(false);
 
-				var payload = new Channel
+				var payload = new Channel(fetchResult.Attributes)
 				{
 					UniqueName = fetchResult.UniqueName,
 					FriendlyName = fetchResult.FriendlyName,
@@ -165,6 +165,34 @@ namespace TwilioHttpClient
 				return ProcessException<Channel>(ex, nameof(ChannelFetchAsync));
 			}
 		}
+        public async Task<HttpClientResult<Channel>> ChannelAttributesUpdateAsync(string channelUniqueIdentifier, string attributes)
+        {
+            if (String.IsNullOrWhiteSpace(channelUniqueIdentifier))
+				return new HttpClientResult<Channel>(HttpStatusCode.BadRequest, $"Invalid {nameof(channelUniqueIdentifier)} value: [{channelUniqueIdentifier}]");
+
+            if (String.IsNullOrWhiteSpace(attributes))
+                return new HttpClientResult<Channel>(HttpStatusCode.BadRequest, $"Invalid {nameof(attributes)} value: [{attributes}]");
+
+			try
+            {
+                ChannelResource updateResult = await ChannelResource.UpdateAsync(_chatServiceId, channelUniqueIdentifier, attributes: attributes, client: _twilioRestClient);
+                
+                var payload = new Channel(updateResult.Attributes)
+                {
+                    UniqueName = updateResult.UniqueName,
+                    FriendlyName = updateResult.FriendlyName,
+                    MembersCount = updateResult.MembersCount ?? 0,
+                    DateCreated = updateResult.DateCreated,
+                    DateUpdated = updateResult.DateUpdated,
+                    Attributes = CustomJsonSerializer.DeserializeFromString<ChannelAttributes>(updateResult.Attributes)
+                };
+                return new HttpClientResult<Channel>(HttpStatusCode.OK, payload);
+			}
+            catch (Exception ex)
+            {
+				return ProcessException<Channel>(ex, nameof(ChannelAttributesUpdateAsync));
+			}
+        }
 
 		public async Task<HttpClientResult<User>> UserFetchAsync(string userId)
 		{

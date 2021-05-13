@@ -14,5 +14,6 @@ namespace TwilioHttpClient.Abstractions
         Task<HttpClientResult<Member[]>> ChannelMembersBulkRetrieveAsync(string channelUniqueIdentifier);
         Task<HttpClientResult<List<UserChannel>>> UserChannelsBulkRetrieveAsync(string userId, int pageSize, int? limit = null);
         Task<HttpClientResult<Channel>> ChannelFetchAsync(string channelUniqueIdentifier);
+        Task<HttpClientResult<Channel>> ChannelAttributesUpdateAsync(string channelUniqueIdentifier, string attributes);
     }
 }

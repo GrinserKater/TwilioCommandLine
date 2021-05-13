@@ -1,8 +1,8 @@
 ﻿using System.Collections.Generic;
 
-namespace TheGrandMigrator.Abstractions
+namespace TheGrandExecutor.Abstractions
 {
-	public interface IMigrationResult<T>
+	public interface IExecutionResult<T>
 	{
 		int FetchedCount { get; }
 		int SuccessCount { get; }

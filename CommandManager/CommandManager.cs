@@ -14,7 +14,7 @@ namespace CommandManager
 			var usageHint = new StringBuilder("Usage: TwilioCommandLine ");
 			usageHint.AppendLine($"--{ExecutionAction.Unblock:G} | --{ExecutionAction.Block:G}");
             usageHint.AppendLine("Mandatory arguments:");
-            usageHint.AppendLine($"\t--{Constants.CommandLineParameters.UserIdArgument} <userId> | {Constants.CommandLineParameters.UniqueNameArgument} <channel unique name>");
+            usageHint.AppendLine($"\t--{Constants.CommandLineParameters.UserIdArgument} <userId> | {Constants.CommandLineParameters.UniqueIdentifierArgument} <channel unique identifier>");
             usageHint.AppendLine("Optional arguments:");
 			usageHint.AppendLine($"\t[--{Constants.CommandLineParameters.PageSizeArgument}]");
 			usageHint.AppendLine($"\t[--{Constants.CommandLineParameters.LimitArgument} | --{Constants.CommandLineParameters.AllArgument}]");
@@ -49,7 +49,7 @@ namespace CommandManager
 			options.UserId = ExtractNextPositionIntegerParameter(arguments, Constants.CommandLineParameters.UserIdArgument, null, null);
 			if (options.UserId == 0)
 			{
-				options.ChannelUniqueIdentifier = ExtractNextPositionStringParameter(arguments, Constants.CommandLineParameters.UniqueNameArgument);
+				options.ChannelUniqueIdentifier = ExtractNextPositionStringParameter(arguments, Constants.CommandLineParameters.UniqueIdentifierArgument);
                 if (String.IsNullOrWhiteSpace(options.ChannelUniqueIdentifier))
                 {
                     ShowUsageHint();

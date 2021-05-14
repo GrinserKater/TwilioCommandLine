@@ -101,7 +101,7 @@ namespace TheGrandExecutor
 
             ExecutionResult<IResource> executionResult =
                 await UpdateSingleChannelAttributesBlockageFieldsAsync(executionOptions.ChannelUniqueIdentifier, executionOptions.DateBefore, 
-                    executionOptions.DateAfter, blockedListingsIds, false);
+                    executionOptions.DateAfter, blockedListingsIds, null, 0, false);
 
             if (executionResult.FetchedCount == 0)
             {
@@ -133,7 +133,7 @@ namespace TheGrandExecutor
 
             ExecutionResult<IResource> executionResult =
                 await UpdateSingleChannelAttributesBlockageFieldsAsync(executionOptions.ChannelUniqueIdentifier, executionOptions.DateBefore,
-                    executionOptions.DateAfter, null, true);
+                    executionOptions.DateAfter, null, null, 0, true);
 
             if (executionResult.FetchedCount == 0)
             {
@@ -157,10 +157,21 @@ namespace TheGrandExecutor
 			if (executionOptions.ResourceLimit > 0) fetchNoMoreThan = executionOptions.ResourceLimit;
 			int entitiesPerPage = executionOptions.PageSize == 0 ? Execution.DefaultPageSize : executionOptions.PageSize;
 
-			var result = new ExecutionResult<IResource>();
+            var result = new ExecutionResult<IResource>();
 
-			// Unfortunately, smart Twilio engineers decided to return absolutely different object as UserChannelResource rather than ChannelResource.
-			HttpClientResult<List<UserChannel>> userChannelsFetchResult = await _twilioClient.UserChannelsBulkRetrieveAsync(executionOptions.UserId.ToString(), entitiesPerPage, fetchNoMoreThan);
+            // first we will fetch the user to take a look at their blockedUsers array.
+            var userFetchResult = await _twilioClient.UserFetchAsync(executionOptions.UserId.ToString());
+            if (!userFetchResult.IsSuccess)
+            {
+                result.Message = $"Fetching the user {executionOptions.UserId} failed. See ErrorMessages for details.";
+                result.ErrorMessages.Add($"Message: [{userFetchResult.FormattedMessage}]; HTTP status code: [{userFetchResult.HttpStatusCode}]");
+                Debug.WriteLine(result.ErrorMessages.Last());
+                return result;
+            }
+            int[] blockedUserIds = userFetchResult.Payload.Attributes?.BlockedUsers;
+
+            // Unfortunately, smart Twilio engineers decided to return absolutely different object as UserChannelResource rather than ChannelResource.
+            HttpClientResult <List<UserChannel>> userChannelsFetchResult = await _twilioClient.UserChannelsBulkRetrieveAsync(executionOptions.UserId.ToString(), entitiesPerPage, fetchNoMoreThan);
 			if (!userChannelsFetchResult.IsSuccess)
 			{
 				result.Message = $"Fetching channels for the user {executionOptions.UserId} failed. See ErrorMessages for details.";
@@ -183,9 +194,9 @@ namespace TheGrandExecutor
             // but this one is slightly optimised for the single user case.
             foreach (UserChannel userChannel in userChannelsFetchResult.Payload)
 			{
-				var channelUpdateExecutionResult =
+                var channelUpdateExecutionResult =
                     await UpdateSingleChannelAttributesBlockageFieldsAsync(userChannel.ChannelSid, executionOptions.DateBefore, executionOptions.DateAfter,
-                        blockedListingsIds, toBlock);
+                        blockedListingsIds, blockedUserIds, executionOptions.UserId, toBlock);
 				CopyExecutionResult(channelUpdateExecutionResult, result, null);
             }
 
@@ -197,7 +208,8 @@ namespace TheGrandExecutor
 			return result;
 		}
 
-        private async Task<ExecutionResult<IResource>> UpdateSingleChannelAttributesBlockageFieldsAsync(string uniqueName, DateTime? dateBefore, DateTime? dateAfter, int[] blockedIds, bool toBlock)
+        private async Task<ExecutionResult<IResource>> UpdateSingleChannelAttributesBlockageFieldsAsync(string uniqueName, DateTime? dateBefore, DateTime? dateAfter,
+            int[] blockedListingsIds, int[] blockedUsersIds, int currentUserId, bool toBlock)
         {
             var result = new ExecutionResult<IResource>();
 
@@ -219,6 +231,13 @@ namespace TheGrandExecutor
                 return result;
             }
 
+            if (await IsBlockedDeliberatelyAsync(blockedUsersIds, currentUserId, channel.UniqueName))
+            {
+                Trace.WriteLine($"Channel {channel.UniqueName} skipped. The channel was blocked by an addresser or by an addressee deliberately.");
+                result.EntitiesSkipped.Add(channel);
+                return result;
+            }
+
             if (!IsIncludedByDate(channel.DateUpdated, dateBefore, dateAfter))
             {
                 Trace.WriteLine($"Channel {channel.UniqueName} skipped. Last updated on {channel.DateUpdated}. Requested time period: {(dateBefore == null ? "" : $"before {dateBefore}")} {(dateAfter == null ? "" : $"after {dateAfter}")}.");
@@ -235,7 +254,7 @@ namespace TheGrandExecutor
 
             // if we provide a list of blocked listings (e.g., from a file), and the channel's listing is in that list,
             // we will not "unblock" it.
-            if (!toBlock && IsInBlockedList(blockedIds, channel.Attributes?.Listing?.Id))
+            if (!toBlock && IsInBlockedList(blockedListingsIds, channel.Attributes?.Listing?.Id))
             {
                 Trace.WriteLine($"Channel {channel.UniqueName} skipped. Found in blocked list when unblocking.");
                 result.EntitiesSkipped.Add(channel);
@@ -254,6 +273,7 @@ namespace TheGrandExecutor
 				return result;
             }
             Trace.WriteLine($"Atrtibutes of the channel {channel.UniqueName} updated successfully. Status \"Blocked\" changed to {toBlock.ToString().ToLower()}");
+            result.EntitiesSucceeded.Add(channel);
             return result;
 		}
 
@@ -281,13 +301,40 @@ namespace TheGrandExecutor
         private bool IsStateAquired(Channel channel, bool toBlock)
         {
             if (channel.Attributes == null) return true;
-            return channel.Attributes.IsBlocked && toBlock;
+            return (channel.Attributes.IsBlocked && toBlock) || (!channel.Attributes.IsBlocked && !toBlock);
         }
 
         private bool IsInBlockedList(int[] referenceIds, int? currentId)
         {
             if (referenceIds == null || referenceIds.Length == 0 || currentId == null) return false;
             return referenceIds.Any(id => id == currentId);
+        }
+
+        private async Task<bool> IsBlockedDeliberatelyAsync(int[] blockedUsersIds, int currentUserId, string channelUniqueName)
+        {
+            if (blockedUsersIds == null || blockedUsersIds.Length == 0) return false;
+
+            var channelUniqueNameParts = channelUniqueName.Split('-');
+            var secondMembersId = channelUniqueNameParts
+                .Skip(1)
+                .Select(id => Int32.TryParse(id, out int userId) ? userId : 0)
+                .FirstOrDefault(id => id > 0 && id != currentUserId);
+            if (secondMembersId == 0) return false;
+            if (blockedUsersIds.Any(id => id == secondMembersId)) return true;
+
+            // Worst case - we need to fetch the other member to know if they don't block the current user.
+            HttpClientResult<User> secondMemeberFetchResut = await _twilioClient.UserFetchAsync(secondMembersId.ToString());
+            if (!secondMemeberFetchResut.IsSuccess)
+            {
+                Trace.WriteLine(
+                    $"Failed to fetch the second channel member with ID  {secondMembersId}; reason: {secondMemeberFetchResut.FormattedMessage}; HTTP status code: {secondMemeberFetchResut.HttpStatusCode}.");
+                // If something failed better not to change anything.
+                return true;
+            }
+
+            var blockedBySecondMember = secondMemeberFetchResut.Payload.Attributes?.BlockedUsers;
+            if (blockedBySecondMember == null || blockedBySecondMember.Length == 0) return false;
+            return blockedBySecondMember.Any(id => id == currentUserId);
         }
 
         private string UpdateAttributesBlockageFields(string sourceAttributes, bool toBlock)

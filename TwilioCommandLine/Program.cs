@@ -44,13 +44,13 @@ namespace TwilioCommandLine
 				{
 					case ExecutionAction.Unblock:
 						executionResult = String.IsNullOrWhiteSpace(options.ChannelUniqueIdentifier) ?
-							await grandExecutor.SetSingleChannelAttributesUnblockedAsync(options) :
-                            await grandExecutor.SetUserChannelsAttributesUnblockedAsync(options);
+                            await grandExecutor.SetUserChannelsAttributesUnblockedAsync(options) :
+                            await grandExecutor.SetSingleChannelAttributesUnblockedAsync(options);
 						break;
 					case ExecutionAction.Block:
 						executionResult = String.IsNullOrWhiteSpace(options.ChannelUniqueIdentifier) ?
-							await grandExecutor.SetSingleChannelAttributesBlockedAsync(options) :
-							await grandExecutor.SetUserChannelsAttributesBlockedAsync(options);
+							await grandExecutor.SetUserChannelsAttributesBlockedAsync(options) :
+							await grandExecutor.SetSingleChannelAttributesBlockedAsync(options);
                         break;
                     default:
 						Trace.WriteLine($"Unsupported execution action {options.ExecutionAction:G}.");

@@ -95,9 +95,13 @@ namespace TheGrandExecutor
                 return result;
             }
 
+            int[] blockedListingsIds = null;
+            if (executionOptions.ConsiderBlockedListings)
+                blockedListingsIds = ReadBlockListingsIdsFromFile(executionOptions.BlockedListingsFileName);
+
             ExecutionResult<IResource> executionResult =
                 await UpdateSingleChannelAttributesBlockageFieldsAsync(executionOptions.ChannelUniqueIdentifier, executionOptions.DateBefore, 
-                    executionOptions.DateAfter, false);
+                    executionOptions.DateAfter, blockedListingsIds, false);
 
             if (executionResult.FetchedCount == 0)
             {
@@ -129,7 +133,7 @@ namespace TheGrandExecutor
 
             ExecutionResult<IResource> executionResult =
                 await UpdateSingleChannelAttributesBlockageFieldsAsync(executionOptions.ChannelUniqueIdentifier, executionOptions.DateBefore,
-                    executionOptions.DateAfter, true);
+                    executionOptions.DateAfter, null, true);
 
             if (executionResult.FetchedCount == 0)
             {
@@ -171,12 +175,17 @@ namespace TheGrandExecutor
 				return result;
 			}
 
-			// This piece of code might seem very similar to the one in MigrateChannelsAttributesAsync,
-			// but this one is slightly optimised for the single user case.
-			foreach (UserChannel userChannel in userChannelsFetchResult.Payload)
+            int[] blockedListingsIds = null;
+            if (executionOptions.ConsiderBlockedListings)
+                blockedListingsIds = ReadBlockListingsIdsFromFile(executionOptions.BlockedListingsFileName);
+
+            // This piece of code might seem very similar to the one in MigrateChannelsAttributesAsync,
+            // but this one is slightly optimised for the single user case.
+            foreach (UserChannel userChannel in userChannelsFetchResult.Payload)
 			{
 				var channelUpdateExecutionResult =
-                    await UpdateSingleChannelAttributesBlockageFieldsAsync(userChannel.ChannelSid, executionOptions.DateBefore, executionOptions.DateAfter, toBlock);
+                    await UpdateSingleChannelAttributesBlockageFieldsAsync(userChannel.ChannelSid, executionOptions.DateBefore, executionOptions.DateAfter,
+                        blockedListingsIds, toBlock);
 				CopyExecutionResult(channelUpdateExecutionResult, result, null);
             }
 
@@ -188,7 +197,7 @@ namespace TheGrandExecutor
 			return result;
 		}
 
-        private async Task<ExecutionResult<IResource>> UpdateSingleChannelAttributesBlockageFieldsAsync(string uniqueName, DateTime? dateBefore, DateTime? dateAfter, bool toBlock)
+        private async Task<ExecutionResult<IResource>> UpdateSingleChannelAttributesBlockageFieldsAsync(string uniqueName, DateTime? dateBefore, DateTime? dateAfter, int[] blockedIds, bool toBlock)
         {
             var result = new ExecutionResult<IResource>();
 
@@ -203,6 +212,13 @@ namespace TheGrandExecutor
 
             var channel = channelFetchResult.Payload;
             result.EntitiesFetched.Add(channel);
+            if (channel.Attributes == null)
+            {
+                Trace.WriteLine($"Channel {channel.UniqueName} skipped. Attributes are empty.");
+                result.EntitiesSkipped.Add(channel);
+                return result;
+            }
+
             if (!IsIncludedByDate(channel.DateUpdated, dateBefore, dateAfter))
             {
                 Trace.WriteLine($"Channel {channel.UniqueName} skipped. Last updated on {channel.DateUpdated}. Requested time period: {(dateBefore == null ? "" : $"before {dateBefore}")} {(dateAfter == null ? "" : $"after {dateAfter}")}.");
@@ -210,16 +226,18 @@ namespace TheGrandExecutor
 				return result;
             }
 
-            if (!IsIncludedByDate(channel.DateUpdated, dateBefore, dateAfter))
+            if (IsStateAquired(channel, toBlock))
             {
-                Trace.WriteLine($"Channel {channel.UniqueName} skipped. Last updated on {channel.DateUpdated}. Requested time period: {(dateBefore == null ? "" : $"before {dateBefore}")} {(dateAfter == null ? "" : $"after {dateAfter}")}.");
+                Trace.WriteLine($"Channel {channel.UniqueName} skipped. Required state [Blocked: {toBlock}] acquired, or no attributes.");
                 result.EntitiesSkipped.Add(channel);
                 return result;
             }
 
-            if (IsStateAquired(channel, toBlock))
+            // if we provide a list of blocked listings (e.g., from a file), and the channel's listing is in that list,
+            // we will not "unblock" it.
+            if (!toBlock && IsInBlockedList(blockedIds, channel.Attributes?.Listing?.Id))
             {
-                Trace.WriteLine($"Channel {channel.UniqueName} skipped. Required state [Blocked: {toBlock}] acquired, or no attributes.");
+                Trace.WriteLine($"Channel {channel.UniqueName} skipped. Found in blocked list when unblocking.");
                 result.EntitiesSkipped.Add(channel);
                 return result;
             }
@@ -266,8 +284,9 @@ namespace TheGrandExecutor
             return channel.Attributes.IsBlocked && toBlock;
         }
 
-        private bool IsInBlockedList(int[] referenceIds, int currentId)
+        private bool IsInBlockedList(int[] referenceIds, int? currentId)
         {
+            if (referenceIds == null || referenceIds.Length == 0 || currentId == null) return false;
             return referenceIds.Any(id => id == currentId);
         }
 

@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using CommandManager;
-using CommandManager.Enums;
+using Common.Enums;
 using Microsoft.Extensions.DependencyInjection;
 using TheGrandExecutor.Abstractions;
 using TwilioCommandLine.Logging;
@@ -39,33 +39,35 @@ namespace TwilioCommandLine
 
 				var sw = new Stopwatch();
 				sw.Start();
-                IExecutionResult<IResource> migrationResult;
+                IExecutionResult<IResource> executionResult;
 				switch (options.ExecutionAction)
 				{
 					case ExecutionAction.Unblock:
-						migrationResult = await grandExecutor.MigrateUsersAttributesAsync(options.DateBefore, options.DateAfter, options.ResourceLimit, options.PageSize);
+						executionResult = String.IsNullOrWhiteSpace(options.ChannelUniqueIdentifier) ?
+							await grandExecutor.SetSingleChannelAttributesUnblockedAsync(options) :
+                            await grandExecutor.SetUserChannelsAttributesUnblockedAsync(options);
 						break;
 					case ExecutionAction.Block:
-						migrationResult = String.IsNullOrWhiteSpace(options.ChannelUniqueIdentifier) ?
-							await grandExecutor.MigrateChannelsAttributesAsync(options.DateBefore, options.DateAfter, options.ResourceLimit, options.PageSize) :
-							await grandExecutor.MigrateSingleChannelAttributesAsync(options.DateBefore, options.DateAfter, options.ChannelUniqueIdentifier);
+						executionResult = String.IsNullOrWhiteSpace(options.ChannelUniqueIdentifier) ?
+							await grandExecutor.SetSingleChannelAttributesBlockedAsync(options) :
+							await grandExecutor.SetUserChannelsAttributesBlockedAsync(options);
                         break;
                     default:
-						Trace.WriteLine($"Unsupported migration entity {options.ExecutionAction:G}.");
+						Trace.WriteLine($"Unsupported execution action {options.ExecutionAction:G}.");
 						return;
 				}
 				sw.Stop();
 
-				LoggingUtilities.WriteMigrationResultLogFiles(migrationResult);
-				Trace.WriteLine($"Migration finished. Time elapsed: {sw.Elapsed.Seconds}s. Results:");
+				LoggingUtilities.WriteExecutionResultLogFiles(executionResult);
+				Trace.WriteLine($"Execution finished. Time elapsed: {sw.Elapsed.Seconds}s. Results:");
 				Trace.WriteLine(
-					$"\tTotal fetched from Twilio: {migrationResult.FetchedCount}; migrated: {migrationResult.SuccessCount}; skipped: {migrationResult.SkippedCount}; failed {migrationResult.FailedCount}.");
+					$"\tTotal fetched from Twilio: {executionResult.FetchedCount}; successfully processed: {executionResult.SuccessCount}; skipped: {executionResult.SkippedCount}; failed {executionResult.FailedCount}.");
 
-				if (migrationResult.FailedCount == 0) return;
+				if (executionResult.FailedCount == 0) return;
 
-                Trace.WriteLine("The following messages were recorded during the migration:");
-				Trace.WriteLine($"\t{migrationResult.Message}");
-				foreach (string message in migrationResult.ErrorMessages) Trace.WriteLine($"\t{message}");
+                Trace.WriteLine("The following messages were recorded during the execution:");
+				Trace.WriteLine($"\t{executionResult.Message}");
+				foreach (string message in executionResult.ErrorMessages) Trace.WriteLine($"\t{message}");
 			}
 			catch (Exception ex)
 			{

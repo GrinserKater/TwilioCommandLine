@@ -1,7 +1,7 @@
 ﻿using System;
-using CommandManager.Enums;
+using Common.Enums;
 
-namespace CommandManager
+namespace Common.Options
 {
     public class ExecutionOptions
     {

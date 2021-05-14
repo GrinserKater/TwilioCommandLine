@@ -1,4 +1,4 @@
-﻿namespace CommandManager.Enums
+﻿namespace Common.Enums
 {
     public enum ExecutionAction : byte
     {

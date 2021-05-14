@@ -19,7 +19,7 @@ namespace TwilioCommandLine.Logging
             Directory.CreateDirectory(LogFolder);
         }
 
-        public static void WriteMigrationResultLogFiles(IExecutionResult<IResource> result)
+        public static void WriteExecutionResultLogFiles(IExecutionResult<IResource> result)
         {
             if (result.SuccessCount > 0) File.AppendAllLines(SuccessLogFileName, result.EntitiesSucceeded.Select(e => e.ToString()).ToArray());
 
